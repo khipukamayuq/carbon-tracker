@@ -1,5 +1,7 @@
 # carbon-tracker
 
+[![100% Vibe_Coded](https://img.shields.io/badge/100%25-Vibe_Coded-ff69b4?style=for-the-badge&logo=claude&logoColor=white)](https://github.com/ai-ecoverse/vibe-coded-badge-action)
+
 Local energy/carbon impact tracking for dev work on this machine, focused on Claude Code.
 
 - **Real local measurement** via [CodeCarbon](https://github.com/mlco2/codecarbon)
