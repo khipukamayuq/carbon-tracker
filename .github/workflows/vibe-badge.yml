@@ -1,0 +1,20 @@
+name: Vibe Coded Badge
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  update-badge:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: ai-ecoverse/vibe-coded-badge-action@c6875e7a00b5fa208aef24a2e083ccbe13fa870d # main as of 2026-07-05
+        with:
+          readme-path: README.md
