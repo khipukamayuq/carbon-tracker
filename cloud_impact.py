@@ -70,8 +70,9 @@ def _version_key(name: str) -> tuple:
     # "claude-opus-latest") returns (), which sorts as the lowest possible
     # tuple - it would silently lose to any versioned sibling in
     # max(candidates, key=_version_key), not necessarily correctly. No such
-    # name exists in the registry today, so left as a documented fragility
-    # rather than guessed-at behavior for a naming pattern that doesn't exist.
+    # name exists in the registry today; rather than guess at ordering for a
+    # naming pattern that doesn't exist, _auto_alias() below surfaces this
+    # case as a stderr warning if it ever occurs.
     name = _DATE_SUFFIX.sub("", name)
     nums = []
     for segment in reversed(name.split("-")):
@@ -108,7 +109,18 @@ def _auto_alias(provider: str, model: str) -> str | None:
         ]
     except Exception:
         return None
-    return max(candidates, key=_version_key) if candidates else None
+    if not candidates:
+        return None
+    unversioned = [c for c in candidates if _version_key(c) == ()]
+    if unversioned:
+        print(
+            f"Warning: {', '.join(unversioned)} has no parseable version "
+            "suffix; _version_key() treats it as the lowest-versioned "
+            "candidate, so it will never be auto-selected by max(). If it "
+            "should take priority, add a manual entry to MODEL_ALIASES.",
+            file=sys.stderr,
+        )
+    return max(candidates, key=_version_key)
 
 
 def resolve_model(provider: str, model: str) -> str:

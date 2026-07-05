@@ -52,6 +52,47 @@ def test_version_key_orders_opus_family_with_4_8_last():
     assert max(names, key=cloud_impact._version_key) == "claude-opus-4-8"
 
 
+def test_version_key_no_digits_returns_empty_tuple():
+    assert cloud_impact._version_key("claude-opus-latest") == ()
+
+
+class _FakeProvider:
+    def __init__(self, value):
+        self.value = value
+
+
+class _FakeModel:
+    def __init__(self, provider, name):
+        self.provider = _FakeProvider(provider)
+        self.name = name
+
+
+class _FakeRegistry:
+    def __init__(self, models):
+        self._models = models
+
+    def list_models(self):
+        return self._models
+
+    def find_model(self, provider, model_name):
+        return None
+
+
+def test_auto_alias_warns_on_unversioned_candidate(monkeypatch, capsys):
+    fake_registry = _FakeRegistry(
+        [
+            _FakeModel("anthropic", "claude-opus-latest"),
+            _FakeModel("anthropic", "claude-opus-4-8"),
+        ]
+    )
+    monkeypatch.setattr(cloud_impact, "_model_registry", fake_registry)
+    resolved = cloud_impact._auto_alias("anthropic", "claude-opus-4-9")
+    assert resolved == "claude-opus-4-8"
+    err = capsys.readouterr().err
+    assert "has no parseable version suffix" in err
+    assert "claude-opus-latest" in err
+
+
 def test_resolve_model_exact_registered_passthrough(capsys):
     resolved = cloud_impact.resolve_model("anthropic", "claude-opus-4-8")
     assert resolved == "claude-opus-4-8"
