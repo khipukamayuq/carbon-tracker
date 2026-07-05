@@ -17,15 +17,19 @@ def test_wraps_command_and_writes_a_real_row(monkeypatch, temp_db):
     """Light integration smoke test - wraps a trivial real command and checks
     a row lands with the right label/duration, without pinning specific
     wattage values (those are real hardware measurements, not fixed constants)."""
-    monkeypatch.setattr("sys.argv", ["carbon_run.py", "pytest-smoke-test", "--", "sleep", "1"])
+    monkeypatch.setattr(
+        "sys.argv", ["carbon_run.py", "pytest-smoke-test", "--", "sleep", "1"]
+    )
     exit_code = carbon_run.main()
     assert exit_code == 0
 
     conn = sqlite3.connect(str(temp_db))
     conn.row_factory = sqlite3.Row
-    row = dict(conn.execute(
-        "SELECT * FROM emissions WHERE project_name = 'pytest-smoke-test'"
-    ).fetchone())
+    row = dict(
+        conn.execute(
+            "SELECT * FROM emissions WHERE project_name = 'pytest-smoke-test'"
+        ).fetchone()
+    )
     conn.close()
 
     assert row["project_name"] == "pytest-smoke-test"

@@ -1,4 +1,5 @@
 """Shared fixtures. Ensures no test ever touches the real emissions.db/csv."""
+
 import os
 import sys
 

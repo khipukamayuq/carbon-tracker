@@ -3,6 +3,7 @@
 
 Usage: carbon_run.py <label> -- <command> [args...]
 """
+
 import subprocess
 import sys
 
@@ -12,6 +13,11 @@ from storage import SQLiteOutput
 
 
 def main() -> int:
+    # Manual parsing rather than argparse: argparse's nargs=REMAINDER can wrap
+    # an arbitrary trailing command fine (tested - it passes through the
+    # wrapped command's own flags correctly, with or without a literal '--'),
+    # but that makes '--' optional, silently loosening the interface this
+    # tool's tests currently enforce (omitting '--' is a usage error, exit 2).
     args = sys.argv[1:]
     if len(args) < 2 or args[1] != "--":
         print("Usage: carbon_run.py <label> -- <command> [args...]", file=sys.stderr)

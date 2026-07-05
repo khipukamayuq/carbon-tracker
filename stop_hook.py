@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """Claude Code Stop hook: logs real per-turn token usage as an EcoLogits
-estimate into emissions.csv, so carbonboard reflects actual usage instead of
-manual smoke-test placeholders.
+estimate via cloud_impact.log_estimate().
 
 Reads the hook's stdin JSON (transcript_path, session_id), sums output_tokens
 across all assistant transcript entries since the last time this hook ran for
-that session, and logs one estimate row via cloud_impact.log_estimate().
+that session.
 
 Must never fail loudly or block Claude Code: all errors are caught and
 written to hook_errors.log, and this always exits 0 with no stdout.
 """
+
 import json
 import os
 import sys
@@ -61,7 +61,6 @@ def main() -> None:
 
     last_offset = load_last_offset(session_id)
     new_lines = lines[last_offset:]
-    save_offset(session_id, len(lines))  # save eagerly: never reprocess on failure
 
     total_output_tokens = 0
     model = None
@@ -91,7 +90,8 @@ def main() -> None:
             last_ts = ts
 
     if total_output_tokens == 0 or model is None:
-        return  # nothing new to log (e.g. a Stop with no assistant usage yet)
+        save_offset(session_id, len(lines))  # nothing to log, safe to advance
+        return
 
     latency = 1.0
     if first_ts and last_ts:
@@ -109,7 +109,17 @@ def main() -> None:
     try:
         log_estimate("claude-code", "anthropic", model, total_output_tokens, latency)
     except NoEstimateAvailable as e:
+        # Genuinely unregistered model - retrying won't help, advance past it.
         log_error(f"session={session_id} model={model}: {e}")
+        save_offset(session_id, len(lines))
+    except Exception:
+        # Unexpected failure (e.g. a real bug): don't advance the offset, so
+        # this data is retried next Stop instead of silently dropped.
+        log_error(
+            f"session={session_id} model={model}: unexpected error, will retry next turn"
+        )
+    else:
+        save_offset(session_id, len(lines))
 
 
 if __name__ == "__main__":

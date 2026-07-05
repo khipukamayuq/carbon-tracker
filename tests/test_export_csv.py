@@ -21,6 +21,8 @@ def test_export_csv_main_round_trip(monkeypatch, temp_db, tmp_path):
 
 def test_export_csv_main_defaults_to_base_dir_path(monkeypatch, temp_db, tmp_path):
     monkeypatch.setattr(export_csv, "BASE_DIR", str(tmp_path))
-    monkeypatch.setattr("sys.argv", ["export_csv.py"])  # no explicit path -> use default
+    monkeypatch.setattr(
+        "sys.argv", ["export_csv.py"]
+    )  # no explicit path -> use default
     assert export_csv.main() == 0
     assert (tmp_path / "emissions.csv").exists()

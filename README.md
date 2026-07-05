@@ -12,6 +12,13 @@ Local energy/carbon impact tracking for dev work on this machine, focused on Cla
   [`carbonboard`](https://github.com/mlco2/codecarbon) (CodeCarbon's local dashboard),
   supervised via `launchd` for crash recovery and auto-start.
 
+## Setup
+
+```sh
+uv venv .venv --python 3.14
+uv pip install --python .venv -r requirements.txt
+```
+
 ## Usage
 
 ```sh

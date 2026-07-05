@@ -6,6 +6,7 @@ __pycache__/
 
 # Runtime-generated data/state, not source
 emissions.db
+emissions.db.bak-*
 emissions.csv
 .hook_state/
 *.log

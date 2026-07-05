@@ -8,9 +8,10 @@ Usage:
     cloud_impact.py --label claude-cloud --provider anthropic \
         --model claude-sonnet-5 --output-tokens 842 --latency 6.4
 
-Cloud rows are tagged tracking_mode=estimated, on_cloud=Y, cloud_provider=<provider>,
+Cloud rows are tagged tracking_mode=estimated, on_cloud=N, cloud_provider=<provider>,
 codecarbon_version=ecologits, so they're distinguishable from real CodeCarbon rows.
 """
+
 import argparse
 import os
 import re
@@ -65,6 +66,12 @@ def _version_key(name: str) -> tuple:
     counts gets this backwards (EcoLogits' newer Opus snapshots are estimated
     *smaller* than older ones), so this compares version numbers instead.
     """
+    # A name with no trailing digits at all (e.g. a hypothetical
+    # "claude-opus-latest") returns (), which sorts as the lowest possible
+    # tuple - it would silently lose to any versioned sibling in
+    # max(candidates, key=_version_key), not necessarily correctly. No such
+    # name exists in the registry today, so left as a documented fragility
+    # rather than guessed-at behavior for a naming pattern that doesn't exist.
     name = _DATE_SUFFIX.sub("", name)
     nums = []
     for segment in reversed(name.split("-")):
@@ -79,7 +86,9 @@ def _is_registered(provider: str, model: str) -> bool:
     if _model_registry is None:
         return False
     try:
-        return _model_registry.find_model(provider=provider, model_name=model) is not None
+        return (
+            _model_registry.find_model(provider=provider, model_name=model) is not None
+        )
     except Exception:
         return False
 
@@ -93,7 +102,8 @@ def _auto_alias(provider: str, model: str) -> str | None:
     family_prefix = f"claude-{match.group(1)}"
     try:
         candidates = [
-            m.name for m in _model_registry.list_models()
+            m.name
+            for m in _model_registry.list_models()
             if m.provider.value == provider and family_prefix in m.name
         ]
     except Exception:
@@ -113,13 +123,19 @@ def resolve_model(provider: str, model: str) -> str:
     if _is_registered(provider, model):
         return model
     if model in MODEL_ALIASES:
-        print(f"Note: {model} not in EcoLogits registry, using pinned alias "
-              f"{MODEL_ALIASES[model]}", file=sys.stderr)
+        print(
+            f"Note: {model} not in EcoLogits registry, using pinned alias "
+            f"{MODEL_ALIASES[model]}",
+            file=sys.stderr,
+        )
         return MODEL_ALIASES[model]
     auto = _auto_alias(provider, model)
     if auto:
-        print(f"Note: {model} not in EcoLogits registry, auto-resolved to "
-              f"same-family match {auto}", file=sys.stderr)
+        print(
+            f"Note: {model} not in EcoLogits registry, auto-resolved to "
+            f"same-family match {auto}",
+            file=sys.stderr,
+        )
         return auto
     return model
 
@@ -137,7 +153,9 @@ class NoEstimateAvailable(Exception):
     pass
 
 
-def log_estimate(label: str, provider: str, model: str, output_tokens: int, latency: float) -> dict:
+def log_estimate(
+    label: str, provider: str, model: str, output_tokens: int, latency: float
+) -> dict:
     """Compute an EcoLogits impact estimate and insert it into the emissions DB.
 
     Raises NoEstimateAvailable if the (possibly aliased) model isn't in
@@ -156,12 +174,16 @@ def log_estimate(label: str, provider: str, model: str, output_tokens: int, late
             f"No estimate available for {provider}/{model} (resolved: {resolved_model}): {result.errors}"
         )
 
-    energy_kwh = mean_range(result.energy.value)
-    emissions_kg = mean_range(result.gwp.value)
+    energy_kwh = to_scalar(result.energy.value)
+    emissions_kg = to_scalar(result.gwp.value)
 
     iso3 = country_name = "unspecified"
     pue = wue = 0
-    provider_config = PROVIDER_CONFIG_MAP.get(provider) if hasattr(PROVIDER_CONFIG_MAP, "get") else None
+    provider_config = (
+        PROVIDER_CONFIG_MAP.get(provider)
+        if hasattr(PROVIDER_CONFIG_MAP, "get")
+        else None
+    )
     if provider_config is not None:
         try:
             iso3 = provider_config.datacenter_location
@@ -178,37 +200,43 @@ def log_estimate(label: str, provider: str, model: str, output_tokens: int, late
             pue = wue = 0
 
     row = {name: "" for name in FIELDNAMES}
-    row.update({
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "project_name": f"{label}:estimated",
-        "run_id": str(uuid.uuid4()),
-        "experiment_id": "ecologits-estimate",
-        "duration": latency,
-        "emissions": emissions_kg,
-        "emissions_rate": emissions_kg / latency if latency else 0,
-        "cpu_power": 0, "gpu_power": 0, "ram_power": 0,
-        "cpu_energy": 0, "gpu_energy": 0, "ram_energy": 0,
-        "energy_consumed": energy_kwh,
-        "water_consumed": 0,
-        "country_name": country_name,
-        "country_iso_code": iso3,
-        "region": "unspecified",
-        "cloud_provider": provider,
-        "codecarbon_version": "ecologits",
-        "cpu_count": 0, "gpu_count": 0,
-        "ram_total_size": 0,
-        "tracking_mode": "estimated",
-        "cpu_utilization_percent": 0, "gpu_utilization_percent": 0,
-        "ram_utilization_percent": 0, "ram_used_gb": 0,
-        # "N" not "Y": on_cloud=Y gates carbonboard's Cloud Emissions Comparison
-        # widget, which only supports GCP regions (codecarbon/data/cloud/impact.csv
-        # has zero rows for any other provider) - it crashes for any other
-        # cloud_provider/cloud_region, and there's no honest GCP region to supply
-        # for third-party API inference. "N" is CodeCarbon's own sanctioned
-        # early-return for "not applicable", not a workaround.
-        "on_cloud": "N",
-        "pue": pue, "wue": wue,
-    })
+    row.update(
+        {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "project_name": f"{label}:estimated",
+            "run_id": str(uuid.uuid4()),
+            "experiment_id": "ecologits-estimate",
+            "duration": latency,
+            "emissions": emissions_kg,
+            "emissions_rate": emissions_kg / latency if latency else 0,
+            "cpu_power": 0,
+            "gpu_power": 0,
+            "ram_power": 0,
+            "cpu_energy": 0,
+            "gpu_energy": 0,
+            "ram_energy": 0,
+            "energy_consumed": energy_kwh,
+            "water_consumed": 0,
+            "country_name": country_name,
+            "country_iso_code": iso3,
+            "region": "unspecified",
+            "cloud_provider": provider,
+            "codecarbon_version": "ecologits",
+            "cpu_count": 0,
+            "gpu_count": 0,
+            "ram_total_size": 0,
+            "tracking_mode": "estimated",
+            "cpu_utilization_percent": 0,
+            "gpu_utilization_percent": 0,
+            "ram_utilization_percent": 0,
+            "ram_used_gb": 0,
+            # "Y" would route this into carbonboard's GCP-only Cloud Emissions
+            # Comparison widget, which crashes for any other provider.
+            "on_cloud": "N",
+            "pue": pue,
+            "wue": wue,
+        }
+    )
 
     insert_row(row)
     return row
@@ -216,21 +244,31 @@ def log_estimate(label: str, provider: str, model: str, output_tokens: int, late
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--label", required=True, help="project_name prefix, e.g. 'claude-cloud'")
+    parser.add_argument(
+        "--label", required=True, help="project_name prefix, e.g. 'claude-cloud'"
+    )
     parser.add_argument("--provider", required=True, help="e.g. anthropic, openai")
-    parser.add_argument("--model", required=True, help="live model id, e.g. claude-sonnet-5")
+    parser.add_argument(
+        "--model", required=True, help="live model id, e.g. claude-sonnet-5"
+    )
     parser.add_argument("--output-tokens", type=int, required=True)
-    parser.add_argument("--latency", type=float, required=True, help="request latency in seconds")
+    parser.add_argument(
+        "--latency", type=float, required=True, help="request latency in seconds"
+    )
     args = parser.parse_args()
 
     try:
-        row = log_estimate(args.label, args.provider, args.model, args.output_tokens, args.latency)
+        row = log_estimate(
+            args.label, args.provider, args.model, args.output_tokens, args.latency
+        )
     except NoEstimateAvailable as e:
         print(str(e), file=sys.stderr)
         return 1
 
-    print(f"Logged estimate: {args.label} model={args.model} "
-          f"energy={float(row['energy_consumed']):.6f}kWh emissions={float(row['emissions']):.6f}kgCO2eq")
+    print(
+        f"Logged estimate: {args.label} model={args.model} "
+        f"energy={float(row['energy_consumed']):.6f}kWh emissions={float(row['emissions']):.6f}kgCO2eq"
+    )
     return 0
 
 
