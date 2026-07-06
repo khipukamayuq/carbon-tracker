@@ -2,6 +2,9 @@
 
 [![100% Vibe_Coded](https://img.shields.io/badge/100%25-Vibe_Coded-ff69b4?style=for-the-badge&logo=claude&logoColor=white)](https://github.com/ai-ecoverse/vibe-coded-badge-action)
 
+## Not suitable for actual use
+This was a first pass at a carbon tracking tool for estimating GenAI power consumptions and emissions. There are fundamental problems with the implementation at this time, not least of which, was my own lack of understanding of the assumptions baked into EcoLogits wide margin for error when dealing with closed models such as Claude.
+
 Local energy/carbon impact tracking for dev work, focused on Claude Code.
 
 Local commands are *measured* and cloud LLM calls are *estimated*, but both paths
